@@ -5,6 +5,7 @@ from gtts import gTTS
 import os
 import speech_recognition as spr
 import time
+from pydub import AudioSegment
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'static/audio'
@@ -132,30 +133,41 @@ def speech_to_text():
         return jsonify({'error': 'No audio file provided'}), 400
 
     audio_file = request.files['audio']
-
+    
     try:
-        # Save temporary audio file
-        temp_filename = f"stt_{int(time.time())}.wav"
+        # Create temporary files
+        temp_filename = f"stt_{int(time.time())}"
         temp_path = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+        wav_path = f"{temp_path}.wav"
+        
+        # Save uploaded file
         audio_file.save(temp_path)
-
+        
+        # Convert to 16kHz mono WAV using pydub
+        audio = AudioSegment.from_file(temp_path)
+        audio = audio.set_frame_rate(16000).set_channels(1)
+        audio.export(wav_path, format="wav")
+        
         # Recognize speech
         recognizer = spr.Recognizer()
-        with spr.AudioFile(temp_path) as source:
+        with spr.AudioFile(wav_path) as source:
             audio_data = recognizer.record(source)
             text = recognizer.recognize_google(audio_data)
-
-        # Clean up temporary file
-        os.remove(temp_path)
-
+        
         return jsonify({'text': text})
-
+        
     except spr.UnknownValueError:
         return jsonify({'error': 'Could not understand audio'}), 400
     except spr.RequestError as e:
         return jsonify({'error': f'Speech recognition service error: {e}'}), 500
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+    finally:
+        # Clean up temporary files
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+        if os.path.exists(wav_path):
+            os.remove(wav_path)
 
 
 if __name__ == '__main__':
