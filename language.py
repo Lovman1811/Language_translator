@@ -4,7 +4,6 @@ from googletrans import Translator
 from gtts import gTTS
 import os
 import speech_recognition as spr
-import pyperclip as pc
 import time
 
 app = Flask(__name__)
